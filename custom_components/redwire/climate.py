@@ -39,7 +39,11 @@ async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities):
 class RedwireClimate(ClimateEntity):
     _attr_should_poll = False
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
-    _attr_supported_features = ClimateEntityFeature.TARGET_TEMPERATURE
+    _attr_supported_features = (
+        ClimateEntityFeature.TARGET_TEMPERATURE
+        | ClimateEntityFeature.TURN_ON
+        | ClimateEntityFeature.TURN_OFF
+    )
     _attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
     _attr_icon = "mdi:hvac"
     _attr_precision = 1.0
@@ -73,7 +77,11 @@ class RedwireClimate(ClimateEntity):
 
     @property
     def supported_features(self) -> int:
-        return ClimateEntityFeature.TARGET_TEMPERATURE
+        return (
+            ClimateEntityFeature.TARGET_TEMPERATURE
+            | ClimateEntityFeature.TURN_ON
+            | ClimateEntityFeature.TURN_OFF
+        )
 
     @property
     def target_temperature(self):
