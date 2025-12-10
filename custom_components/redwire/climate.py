@@ -55,6 +55,8 @@ class RedwireClimate(ClimateEntity):
         self._state = RedwireState(target_temp=None, is_on=False)
         # If no setpoint received yet, start with a sensible default so the UI shows the dial
         self._state.target_temp = MIN_TEMP
+        # Keep HA's cached attr in sync so the UI shows the value in the center
+        self._attr_target_temperature = float(self._state.target_temp)
 
         self._topic_setpoint: str = entry.data.get(CONF_TOPIC_SETPOINT)
         self._topic_state: str = entry.data.get(CONF_TOPIC_STATE)
@@ -70,8 +72,12 @@ class RedwireClimate(ClimateEntity):
         return HVACMode.HEAT if self._state.is_on else HVACMode.OFF
 
     @property
+    def supported_features(self) -> int:
+        return ClimateEntityFeature.TARGET_TEMPERATURE
+
+    @property
     def target_temperature(self):
-        return self._state.target_temp
+        return self._attr_target_temperature
 
     @property
     def min_temp(self):
@@ -98,6 +104,7 @@ class RedwireClimate(ClimateEntity):
             return
         await mqtt.async_publish(self.hass, self._topic_setpoint, str(temp_int), qos=1, retain=False)
         self._state.target_temp = temp_int
+        self._attr_target_temperature = float(temp_int)
         self.async_write_ha_state()
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode):
@@ -112,7 +119,16 @@ class RedwireClimate(ClimateEntity):
         # Make sure a target temp exists so HA shows the control when heating
         if self._state.is_on and self._state.target_temp is None:
             self._state.target_temp = MIN_TEMP
+        # Sync cached attr
+        if self._state.target_temp is not None:
+            self._attr_target_temperature = float(self._state.target_temp)
         self.async_write_ha_state()
+
+    async def async_turn_on(self) -> None:
+        await self.async_set_hvac_mode(HVACMode.HEAT)
+
+    async def async_turn_off(self) -> None:
+        await self.async_set_hvac_mode(HVACMode.OFF)
 
     async def async_added_to_hass(self):
         @callback
@@ -144,6 +160,7 @@ class RedwireClimate(ClimateEntity):
                 _LOGGER.warning("Setpoint out of range %s not in [%s,%s]", val, MIN_TEMP, MAX_TEMP)
                 return
             self._state.target_temp = val
+            self._attr_target_temperature = float(val)
             self.async_write_ha_state()
 
         @callback
