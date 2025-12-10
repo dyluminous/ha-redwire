@@ -67,6 +67,8 @@ class RedwireClimate(ClimateEntity):
         self._topic_setpoint: str = entry.data.get(CONF_TOPIC_SETPOINT)
         self._topic_state: str = entry.data.get(CONF_TOPIC_STATE)
         self._current_temperature: float | None = None
+        # Start unavailable until we read a valid temperature
+        self._attr_available = False
         self._temperature_sensor_entity_id: str = entry.data.get(CONF_TEMPERATURE_SENSOR)
 
     @property
@@ -100,6 +102,10 @@ class RedwireClimate(ClimateEntity):
     @property
     def current_temperature(self):
         return self._current_temperature
+
+    @property
+    def available(self) -> bool:
+        return getattr(self, "_attr_available", True)
 
     async def async_set_temperature(self, **kwargs):
         if (temp := kwargs.get(ATTR_TEMPERATURE)) is None:
@@ -141,14 +147,32 @@ class RedwireClimate(ClimateEntity):
         await self.async_set_hvac_mode(HVACMode.OFF)
 
     async def async_added_to_hass(self):
+        # Initialize from current sensor state so the card shows a value immediately
+        initial = self.hass.states.get(self._temperature_sensor_entity_id)
+        if initial is not None:
+            try:
+                self._current_temperature = float(initial.state)
+                self._attr_available = True
+            except (TypeError, ValueError):
+                self._attr_available = False
+        else:
+            self._attr_available = False
+        self.async_write_ha_state()
+
         @callback
         def _sensor_state_change(event):
             state = event.data.get("new_state")
             if not state:
+                self._attr_available = False
+                self.async_write_ha_state()
                 return
             try:
                 self._current_temperature = float(state.state)
+                # Valid temperature -> entity available
+                self._attr_available = True
             except (TypeError, ValueError):
+                # Unknown/unavailable or non-float -> mark unavailable
+                self._attr_available = False
                 _LOGGER.debug("Temperature sensor state not a float: %s", state.state)
                 return
             self.async_write_ha_state()
