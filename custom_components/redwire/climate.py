@@ -42,6 +42,8 @@ class RedwireClimate(ClimateEntity):
     _attr_supported_features = ClimateEntityFeature.TARGET_TEMPERATURE
     _attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
     _attr_icon = "mdi:hvac"
+    _attr_precision = 1.0
+    _attr_target_temperature_step = 1
 
     def __init__(self, hass: HomeAssistant, entry):
         self.hass = hass
@@ -51,6 +53,8 @@ class RedwireClimate(ClimateEntity):
         self._device_info = DeviceInfo(identifiers={(DOMAIN, entry.entry_id)}, name=DEFAULT_NAME)
 
         self._state = RedwireState(target_temp=None, is_on=False)
+        # If no setpoint received yet, start with a sensible default so the UI shows the dial
+        self._state.target_temp = MIN_TEMP
 
         self._topic_setpoint: str = entry.data.get(CONF_TOPIC_SETPOINT)
         self._topic_state: str = entry.data.get(CONF_TOPIC_STATE)
@@ -105,6 +109,9 @@ class RedwireClimate(ClimateEntity):
             return
         await mqtt.async_publish(self.hass, self._topic_state, payload, qos=1, retain=False)
         self._state.is_on = payload == "1"
+        # Make sure a target temp exists so HA shows the control when heating
+        if self._state.is_on and self._state.target_temp is None:
+            self._state.target_temp = MIN_TEMP
         self.async_write_ha_state()
 
     async def async_added_to_hass(self):
