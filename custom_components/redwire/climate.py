@@ -9,7 +9,7 @@ from homeassistant.components.climate.const import (
     HVACMode,
     ClimateEntityFeature,
 )
-from homeassistant.const import ATTR_TEMPERATURE, TEMP_CELSIUS
+from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.event import async_track_state_change_event
@@ -38,7 +38,7 @@ async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities):
 
 class RedwireClimate(ClimateEntity):
     _attr_should_poll = False
-    _attr_temperature_unit = TEMP_CELSIUS
+    _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_supported_features = ClimateEntityFeature.TARGET_TEMPERATURE
     _attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
 

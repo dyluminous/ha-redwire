@@ -1,7 +1,7 @@
 {
   "domain": "redwire",
   "name": "Redwire MQTT Heater Controller",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "documentation": "https://github.com/dyluminous/ha-redwire",
   "requirements": [],
   "codeowners": ["@dylan"],
