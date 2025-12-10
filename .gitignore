@@ -39,6 +39,9 @@ htmlcov/
 .vscode/
 .idea/
 
+# Mine
+.wip/
+
 # Home Assistant
 .storage/
 .homeassistant/
