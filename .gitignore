@@ -1,0 +1,48 @@
+# General
+*.log
+*.tmp
+*.swp
+*.swo
+*.bak
+*.orig
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+.env
+.env.*
+.python-version
+
+# Packaging
+build/
+dist/
+.eggs/
+*.egg-info/
+
+# Testing & coverage
+.coverage*
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Editors/IDE
+.vscode/
+.idea/
+
+# Home Assistant
+.storage/
+.homeassistant/
+
+# HACS
+*.zip
+hacs.repositories

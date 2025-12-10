@@ -1,0 +1,150 @@
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass
+
+from homeassistant.components import mqtt
+from homeassistant.components.climate import ClimateEntity
+from homeassistant.components.climate.const import (
+    HVACMode,
+    ClimateEntityFeature,
+)
+from homeassistant.const import ATTR_TEMPERATURE, TEMP_CELSIUS
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.event import async_track_state_change_event
+
+from .const import (
+    DOMAIN,
+    DEFAULT_NAME,
+    CONF_TOPIC_SETPOINT,
+    CONF_TOPIC_STATE,
+    CONF_TEMPERATURE_SENSOR,
+    MIN_TEMP,
+    MAX_TEMP,
+)
+
+_LOGGER = logging.getLogger(__name__)
+
+@dataclass
+class RedwireState:
+    target_temp: float | None = None
+    is_on: bool = False
+
+
+async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities):
+    async_add_entities([RedwireClimate(hass, entry)])
+
+
+class RedwireClimate(ClimateEntity):
+    _attr_should_poll = False
+    _attr_temperature_unit = TEMP_CELSIUS
+    _attr_supported_features = ClimateEntityFeature.TARGET_TEMPERATURE
+    _attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
+
+    def __init__(self, hass: HomeAssistant, entry):
+        self.hass = hass
+        self._entry = entry
+        self._attr_name = DEFAULT_NAME
+        self._attr_unique_id = entry.entry_id
+        self._device_info = DeviceInfo(identifiers={(DOMAIN, entry.entry_id)}, name=DEFAULT_NAME)
+
+        self._state = RedwireState(target_temp=None, is_on=False)
+
+        self._topic_setpoint: str = entry.data.get(CONF_TOPIC_SETPOINT)
+        self._topic_state: str = entry.data.get(CONF_TOPIC_STATE)
+        self._current_temperature: float | None = None
+        self._temperature_sensor_entity_id: str = entry.data.get(CONF_TEMPERATURE_SENSOR)
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return self._device_info
+
+    @property
+    def hvac_mode(self):
+        return HVACMode.HEAT if self._state.is_on else HVACMode.OFF
+
+    @property
+    def target_temperature(self):
+        return self._state.target_temp
+
+    @property
+    def min_temp(self):
+        return MIN_TEMP
+
+    @property
+    def max_temp(self):
+        return MAX_TEMP
+
+    @property
+    def current_temperature(self):
+        return self._current_temperature
+
+    async def async_set_temperature(self, **kwargs):
+        if (temp := kwargs.get(ATTR_TEMPERATURE)) is None:
+            return
+        try:
+            temp_int = int(round(float(temp)))
+        except (TypeError, ValueError):
+            _LOGGER.warning("Invalid temperature provided: %s", temp)
+            return
+        if temp_int < MIN_TEMP or temp_int > MAX_TEMP:
+            _LOGGER.warning("Temperature out of range %s not in [%s,%s]", temp_int, MIN_TEMP, MAX_TEMP)
+            return
+        await mqtt.async_publish(self.hass, self._topic_setpoint, str(temp_int), qos=1, retain=False)
+        self._state.target_temp = temp_int
+        self.async_write_ha_state()
+
+    async def async_set_hvac_mode(self, hvac_mode: HVACMode):
+        if hvac_mode == HVACMode.OFF:
+            payload = "0"
+        elif hvac_mode == HVACMode.HEAT:
+            payload = "1"
+        else:
+            return
+        await mqtt.async_publish(self.hass, self._topic_state, payload, qos=1, retain=False)
+        self._state.is_on = payload == "1"
+        self.async_write_ha_state()
+
+    async def async_added_to_hass(self):
+        @callback
+        def _sensor_state_change(event):
+            state = event.data.get("new_state")
+            if not state:
+                return
+            try:
+                self._current_temperature = float(state.state)
+            except (TypeError, ValueError):
+                _LOGGER.debug("Temperature sensor state not a float: %s", state.state)
+                return
+            self.async_write_ha_state()
+
+        async_track_state_change_event(
+            self.hass,
+            [self._temperature_sensor_entity_id],
+            _sensor_state_change,
+        )
+
+        @callback
+        def _handle_setpoint(msg):
+            try:
+                val = int(msg.payload)
+            except ValueError:
+                _LOGGER.warning("Invalid setpoint payload: %s", msg.payload)
+                return
+            if val < MIN_TEMP or val > MAX_TEMP:
+                _LOGGER.warning("Setpoint out of range %s not in [%s,%s]", val, MIN_TEMP, MAX_TEMP)
+                return
+            self._state.target_temp = val
+            self.async_write_ha_state()
+
+        @callback
+        def _handle_state(msg):
+            if msg.payload not in ("0", "1"):
+                _LOGGER.warning("Invalid state payload: %s", msg.payload)
+                return
+            self._state.is_on = msg.payload == "1"
+            self.async_write_ha_state()
+
+        await mqtt.async_subscribe(self.hass, self._topic_setpoint, _handle_setpoint, qos=1)
+        await mqtt.async_subscribe(self.hass, self._topic_state, _handle_state, qos=1)
