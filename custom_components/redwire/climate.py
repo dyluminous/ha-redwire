@@ -46,7 +46,9 @@ class RedwireClimate(ClimateEntity):
     )
     _attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
     _attr_icon = "mdi:hvac"
-    _attr_precision = 1.0
+    # Show one decimal place for displayed temperatures
+    _attr_precision = 0.1
+    # Keep setpoint control to whole degrees
     _attr_target_temperature_step = 1
 
     def __init__(self, hass: HomeAssistant, entry):
