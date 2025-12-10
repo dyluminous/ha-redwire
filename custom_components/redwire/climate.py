@@ -41,6 +41,7 @@ class RedwireClimate(ClimateEntity):
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_supported_features = ClimateEntityFeature.TARGET_TEMPERATURE
     _attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
+    _attr_icon = "mdi:hvac"
 
     def __init__(self, hass: HomeAssistant, entry):
         self.hass = hass
