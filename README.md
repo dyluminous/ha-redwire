@@ -1,5 +1,7 @@
 # Redwire MQTT Heater Controller
 
+> Note to self: This repo has to public as my HA isn't configured to pull private repos... nothing secret in here anyway!
+
 Home Assistant custom integration providing a climate entity that controls an MQTT heater controller.
 
 ## Install
